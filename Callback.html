@@ -1,40 +1,36 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Genesys Cloud Auth Callback</title>
-    <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f4f7f9; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #ff4f1f; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style> </head>
+    <title>Genesys Auth Callback</title>
+    <script src="https://sdk-cdn.mypurecloud.com/webrtc-sdk/v3/genesys-cloud-webrtc-sdk.bundle.min.js"></script>
+</head>
 <body>
-    <div id="message-container">
-        <div class="loader"></div>
-        <p>Completing login...</p>
-    </div>
-
+    <p>Authenticating with Genesys... You can close this window if it doesn't close automatically.</p>
     <script>
-        (function() {
-            const hashParams = new URLSearchParams(window.location.hash.substring(1));
-            const token = hashParams.get('access_token');
-            const error = hashParams.get('error');
+        const urlParams = new URLSearchParams(window.location.hash.substring(1));
+        const token = urlParams.get('access_token');
 
-            if (token) {
-                // IMPORTANT: The target origin MUST allow Salesforce. 
-                // Using '*' ensures the LWC receives the message regardless of the domain.
-                if (window.opener) {
-                    window.opener.postMessage({
-                        type: 'GENESYS_TOKEN',
-                        token: token
-                    }, '*'); 
-                    
-                    console.log('Token sent to Salesforce');
-                    setTimeout(() => { window.close(); }, 500);
+        if (token) {
+            // Initialize the SDK right here in the popup
+            const sdk = new window.GenesysCloudWebrtcSdk({
+                accessToken: token,
+                environment: 'usw2.pure.cloud'
+            });
+
+            sdk.initialize().then(() => {
+                console.log('SDK Ready in Popup');
+                // Tell Salesforce we are authenticated and the SDK is ready
+                window.opener.postMessage({ type: 'GENESYS_AUTH_READY' }, '*');
+            });
+
+            // Listen for commands from the Salesforce LWC
+            window.addEventListener('message', (event) => {
+                if (event.data.type === 'COMMAND_MAKE_CALL') {
+                    console.log('Popup received Dial command for:', event.data.phoneNumber);
+                    sdk.startSession({ phoneNumber: event.data.phoneNumber });
                 }
-            } else if (error) {
-                document.getElementById('message-container').innerHTML = `<p style="color:red">Auth Error: ${error}</p>`;
-            }
-        })();
+            });
+        }
     </script>
 </body>
 </html>
