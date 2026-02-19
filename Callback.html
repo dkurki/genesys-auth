@@ -4,44 +4,55 @@
     <title>Genesys WebRTC Controller</title>
     <script src="https://sdk-cdn.mypurecloud.com/webrtc-sdk/v3/genesys-cloud-webrtc-sdk.bundle.min.js"></script>
 </head>
-<body style="font-family: sans-serif; padding: 20px;">
-    <h3>Genesys SDK Status: <span id="status">Initializing...</span></h3>
-    <p>Keep this window open to maintain your phone connection.</p>
+<body style="font-family: sans-serif; padding: 20px; background: #f4f6f9;">
+    <h3>Genesys SDK Status: <span id="status" style="color: orange;">Initializing...</span></h3>
+    <p id="details">Waiting for Genesys Cloud handshake...</p>
 
     <script>
         const statusEl = document.getElementById('status');
+        const detailsEl = document.getElementById('details');
+        
         const hash = window.location.hash.substring(1);
         const params = new URLSearchParams(hash);
         const token = params.get('access_token');
 
         if (token) {
-            console.log('Token received, initializing SDK...');
+            console.log('Token found, starting SDK...');
             
             const sdk = new window.GenesysCloudWebrtcSdk({
                 accessToken: token,
-                environment: 'usw2.pure.cloud' 
+                environment: 'usw2.pure.cloud' // Double check if this is your region
             });
 
             sdk.initialize().then(() => {
                 console.log('SDK initialized successfully');
                 statusEl.innerText = 'READY';
                 statusEl.style.color = 'green';
+                detailsEl.innerText = 'Connected to Genesys. You can now use the dialer in Salesforce.';
 
-                // Tell Salesforce we are ready
-                window.opener.postMessage({ type: 'GENESYS_AUTH_READY' }, '*');
+                // SEND SIGNAL TO SALESFORCE
+                if (window.opener) {
+                    window.opener.postMessage({ type: 'GENESYS_AUTH_READY' }, '*');
+                } else {
+                    detailsEl.innerText = 'Error: Lost connection to Salesforce window.';
+                }
             }).catch(err => {
                 console.error('SDK Init Error:', err);
-                statusEl.innerText = 'FAILED: ' + err.message;
+                statusEl.innerText = 'FAILED';
+                statusEl.style.color = 'red';
+                detailsEl.innerText = 'Error: ' + (err.message || 'Check console for details');
             });
 
+            // Listen for the Dial command from Salesforce
             window.addEventListener('message', (event) => {
                 if (event.data.type === 'COMMAND_MAKE_CALL') {
-                    console.log('Popup dialing:', event.data.phoneNumber);
+                    console.log('Dialing:', event.data.phoneNumber);
                     sdk.startSession({ phoneNumber: event.data.phoneNumber });
                 }
             });
         } else {
-            statusEl.innerText = 'NO TOKEN FOUND';
+            statusEl.innerText = 'NO TOKEN';
+            detailsEl.innerText = 'OAuth failed. Please try logging in again from Salesforce.';
         }
     </script>
 </body>
