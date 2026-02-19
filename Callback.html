@@ -6,8 +6,7 @@
         body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f4f7f9; }
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #ff4f1f; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </script>
-</head>
+    </style> </head>
 <body>
     <div id="message-container">
         <div class="loader"></div>
@@ -16,34 +15,22 @@
 
     <script>
         (function() {
-            // 1. Get the fragment (hash) for Implicit Grant or query for PKCE
-            const urlParams = new URLSearchParams(window.location.search);
             const hashParams = new URLSearchParams(window.location.hash.substring(1));
-            
-            // Check for access_token (Implicit) or code (PKCE)
             const token = hashParams.get('access_token');
-            const code = urlParams.get('code');
-            const error = urlParams.get('error') || hashParams.get('error');
+            const error = hashParams.get('error');
 
-            if (token || code) {
-                // 2. Send the message to the parent (Salesforce LWC)
-                // We use '*' here, but you should change this to your Salesforce URL for production
-                window.opener.postMessage({
-                    type: 'GENESYS_TOKEN',
-                    token: token,
-                    code: code,
-                    state: urlParams.get('state') || hashParams.get('state')
-                }, window.location.origin); // In a popup, window.location.origin refers to where this is hosted
-
-                // Attempt to send to the opener directly if origin is different
-                window.opener.postMessage({
-                    type: 'GENESYS_TOKEN',
-                    token: token,
-                    code: code
-                }, '*');
-
-                // 3. Success! Close the popup
-                setTimeout(() => { window.close(); }, 500);
+            if (token) {
+                // IMPORTANT: The target origin MUST allow Salesforce. 
+                // Using '*' ensures the LWC receives the message regardless of the domain.
+                if (window.opener) {
+                    window.opener.postMessage({
+                        type: 'GENESYS_TOKEN',
+                        token: token
+                    }, '*'); 
+                    
+                    console.log('Token sent to Salesforce');
+                    setTimeout(() => { window.close(); }, 500);
+                }
             } else if (error) {
                 document.getElementById('message-container').innerHTML = `<p style="color:red">Auth Error: ${error}</p>`;
             }
