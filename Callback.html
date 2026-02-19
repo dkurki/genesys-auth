@@ -4,34 +4,44 @@
     <title>Genesys WebRTC Controller</title>
     <script src="https://sdk-cdn.mypurecloud.com/webrtc-sdk/v3/genesys-cloud-webrtc-sdk.bundle.min.js"></script>
 </head>
-<body>
-    <h3>Genesys Connection Active</h3>
-    <p>Do not close this window. It is handling the audio for Salesforce.</p>
+<body style="font-family: sans-serif; padding: 20px;">
+    <h3>Genesys SDK Status: <span id="status">Initializing...</span></h3>
+    <p>Keep this window open to maintain your phone connection.</p>
 
     <script>
+        const statusEl = document.getElementById('status');
         const hash = window.location.hash.substring(1);
         const params = new URLSearchParams(hash);
         const token = params.get('access_token');
 
         if (token) {
+            console.log('Token received, initializing SDK...');
+            
             const sdk = new window.GenesysCloudWebrtcSdk({
                 accessToken: token,
-                environment: 'usw2.pure.cloud'
+                environment: 'usw2.pure.cloud' 
             });
 
             sdk.initialize().then(() => {
-                console.log('SDK initialized in popup');
-                // Tell Salesforce LWC we are ready to take commands
+                console.log('SDK initialized successfully');
+                statusEl.innerText = 'READY';
+                statusEl.style.color = 'green';
+
+                // Tell Salesforce we are ready
                 window.opener.postMessage({ type: 'GENESYS_AUTH_READY' }, '*');
+            }).catch(err => {
+                console.error('SDK Init Error:', err);
+                statusEl.innerText = 'FAILED: ' + err.message;
             });
 
-            // Listen for the "COMMAND_MAKE_CALL" from Salesforce
             window.addEventListener('message', (event) => {
                 if (event.data.type === 'COMMAND_MAKE_CALL') {
-                    console.log('Dialing:', event.data.phoneNumber);
+                    console.log('Popup dialing:', event.data.phoneNumber);
                     sdk.startSession({ phoneNumber: event.data.phoneNumber });
                 }
             });
+        } else {
+            statusEl.innerText = 'NO TOKEN FOUND';
         }
     </script>
 </body>
